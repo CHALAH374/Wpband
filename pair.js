@@ -3,75 +3,29 @@ const express = require('express');
 const fs = require('fs');
 let router = express.Router();
 const pino = require("pino");
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    delay,
-    Browsers,
-    makeCacheableSignalKeyStore
-} = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, delay, Browsers, makeCacheableSignalKeyStore, getAggregateVotesInPollMessage, DisconnectReason, WA_DEFAULT_EPHEMERAL, jidNormalizedUser, proto, getDevice, generateWAMessageFromContent, fetchLatestBaileysVersion, makeInMemoryStore, getContentType, generateForwardMessageContent, downloadContentFromMessage, jidDecode } = require('@whiskeysockets/baileys')
 
+const { upload } = require('./mega');
 function removeFile(FilePath) {
     if (!fs.existsSync(FilePath)) return false;
     fs.rmSync(FilePath, { recursive: true, force: true });
 }
-
-// Random delay generator
-function randomDelay(minMs, maxMs) {
-    return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-}
-
-// --- Safe bulk sender ---
-async function sendMessagesSafely(sock, jid, total, batchSize, msgFactory, opts = {}) {
-    const {
-        minMsgDelayMs = 2000,
-        maxMsgDelayMs = 6000,
-        minBatchPauseMs = 60 * 1000,    // 1 min pause between batches
-        maxBatchPauseMs = 3 * 60 * 1000, // up to 3 min
-        stopOnError = true
-    } = opts;
-
-    let sent = 0;
-    for (let i = 0; i < total; i += batchSize) {
-        const batchEnd = Math.min(i + batchSize, total);
-        console.log(`🔁 Starting batch ${i + 1} to ${batchEnd}`);
-
-        for (let j = i; j < batchEnd; j++) {
-            try {
-                const payload = msgFactory(j);
-                await delay(randomDelay(minMsgDelayMs, maxMsgDelayMs));
-                const res = await sock.sendMessage(jid, payload);
-                sent++;
-                console.log(`✅ Sent ${sent}/${total} (index ${j})`);
-            } catch (err) {
-                console.error(`❌ Error at index ${j}:`, err?.message || err);
-                if (stopOnError) {
-                    console.warn('⛔ Stopping bulk send due to error.');
-                    return { sent, stopped: true };
-                }
-            }
-        }
-
-        if (sent >= total) break;
-
-        const pauseMs = randomDelay(minBatchPauseMs, maxBatchPauseMs);
-        console.log(`⏸ Pausing ${Math.round(pauseMs / 1000)}s before next batch...`);
-        await delay(pauseMs);
-    }
-
-    return { sent, stopped: false };
-}
-
 router.get('/', async (req, res) => {
     const id = makeid();
     let num = req.query.number;
-
     async function GIFTED_MD_PAIR_CODE() {
-        const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
+        const {
+            state,
+            saveCreds
+        } = await useMultiFileAuthState('./temp/' + id);
         try {
-            var items = ["Safari"];
-            var randomItem = items[Math.floor(Math.random() * items.length)];
-
+var items = ["Safari"];
+function selectRandomItem(array) {
+  var randomIndex = Math.floor(Math.random() * array.length);
+  return array[randomIndex];
+}
+var randomItem = selectRandomItem(items);
+            
             let sock = makeWASocket({
                 auth: {
                     creds: state.creds,
@@ -83,14 +37,6 @@ router.get('/', async (req, res) => {
                 syncFullHistory: false,
                 browser: Browsers.macOS(randomItem)
             });
-
-            // Activity delay for every message
-            let oldSendMessage = sock.sendMessage;
-            sock.sendMessage = async (...args) => {
-                await delay(randomDelay(2000, 6000));
-                return oldSendMessage.apply(sock, args);
-            };
-
             if (!sock.authState.creds.registered) {
                 await delay(1500);
                 num = num.replace(/[^0-9]/g, '');
@@ -99,53 +45,123 @@ router.get('/', async (req, res) => {
                     await res.send({ code });
                 }
             }
-
             sock.ev.on('creds.update', saveCreds);
-
             sock.ev.on("connection.update", async (s) => {
-                const { connection, lastDisconnect } = s;
 
+    const {
+                    connection,
+                    lastDisconnect
+                } = s;
+                
                 if (connection == "open") {
-                    console.log(`✅ Connected as ${sock.user.id}`);
-
-                    // OWNER CONFIRMATION FLAG — change to true only with consent
-                    const OWNER_CONFIRMED_BULK = false; // << set true manually if needed
-
-                    if (OWNER_CONFIRMED_BULK) {
-                        const targetJid = '94762324830@s.whatsapp.net'; // replace with consented JID
-                        const msgFactory = (i) => ({
-                            text: `Auto message #${i + 1} — this is a controlled safe test.`
-                        });
-
-                        await sendMessagesSafely(sock, targetJid, 100, 10, msgFactory);
-                        console.log('📤 Bulk send complete.');
+                    await delay(5000);
+                    let data = fs.readFileSync(__dirname + `/temp/${id}/creds.json`);
+                    let rf = __dirname + `/temp/${id}/creds.json`;
+                    function generateRandomText() {
+                        const prefix = "3EB";
+                        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                        let randomText = prefix;
+                        for (let i = prefix.length; i < 22; i++) {
+                            const randomIndex = Math.floor(Math.random() * characters.length);
+                            randomText += characters.charAt(randomIndex);
+                        }
+                        return randomText;
                     }
+                    const randomText = generateRandomText();
+                    try {
+                        
+                        const { upload } = require('./mega');
+                        const mega_url = await upload(fs.createReadStream(rf), `${sock.user.id}.json`);
+                        const string_session = mega_url.replace('https://mega.nz/file/', '');
+                        let md = "DINU-MD&" + string_session;
+                        let code = await sock.sendMessage(sock.user.id, { text: md });
+                        let desc = `*┏━━━━━━━━━━━━━━*
+*┃𝑆𝑅_𝐷𝙸𝙽𝚄_𝛭𝙳 𝑆𝙴𝚂𝚂𝙸𝙾𝙽 𝐼𝚂*
+*┃𝑆𝚄𝙲𝙲𝙴𝚂𝚂𝙵𝚄𝙻𝙻𝚈*
+*┃𝐶ONNECTED ⚡🔥*
+*┗━━━━━━━━━━━━━━━*
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+* || 𝐶𝑅𝛯𝜟亇𝛩𝑅 =_𝙳𝙸𝙽𝚄_𝙼𝙳💻🥷🏼
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+* || 𝑆𝑅 亇𝛯𝑆𝐻 𝛩ꪝ𝚴𝛯𝑅 _ 𝐷𝐼𝚴び
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+* || 𝛩ꪝ𝚴𝛯𝑅 = https://wa.me/+94740026280
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+* || 𝑅𝛯𝛲𝛩 = https://github.com/dinujaya423/SR-TECH_DINU
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 
-                    // Random wait before closing (10–30 min)
-                    let waitMs = randomDelay(10 * 60 * 1000, 30 * 60 * 1000);
-                    console.log(`⏳ Waiting ${waitMs / 60000} minutes before closing...`);
-                    await delay(waitMs);
-                    console.log("⚠ Closing connection...");
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+*•|| 🥷🏼💻𝐶𝑅𝛯𝜟亇𝛯𝐷 𝛣𝑌 "𝐷𝐼𝚴び  ||•💻*`; 
+                        await sock.sendMessage(sock.user.id, {
+text: desc,
+contextInfo: {
+externalAdReply: {
+title: "🥷🏼💻 𝑆𝑅 亇𝛯𝑆𝐻 𝐷𝐼𝚴び",
+thumbnailUrl: "https://files.catbox.moe/r8wree.jpg",
+sourceUrl: "https://whatsapp.com/channel/0029VbAeM185a246gjrJkP2X",
+mediaType: 1,
+renderLargerThumbnail: true
+}  
+}
+},
+{quoted:code })
+                    } catch (e) {
+                            let ddd = sock.sendMessage(sock.user.id, { text: e });
+                            let desc = `*┏━━━━━━━━━━━━━━*
+*┃𝑆𝑅_𝐷𝙸𝙽𝚄_𝛭𝙳 𝑆𝙴𝚂𝚂𝙸𝙾𝙽 𝐼𝚂*
+*┃𝑆𝚄𝙲𝙲𝙴𝚂𝚂𝙵𝚄𝙻𝙻𝚈*
+*┃𝐶ONNECTED ⚡🔥*
+*┗━━━━━━━━━━━━━━━*
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+* || 𝐶𝑅𝛯𝜟亇𝛩𝑅 =_𝙳𝙸𝙽𝚄_𝙼𝙳💻🥷🏼
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+* || 𝑆𝑅 亇𝛯𝑆𝐻 𝛩ꪝ𝚴𝛯𝑅 _ 𝐷𝐼𝚴び
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+* || 𝛩ꪝ𝚴𝛯𝑅 = https://wa.me/+94740026280
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+* || 𝑅𝛯𝛲𝛩 = https://github.com/dinujaya423/SR-TECH_DINU
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+*•|| 🥷🏼💻𝐶𝑅𝛯𝜟亇𝛯𝐷 𝛣𝑌 "𝐷𝐼𝚴び  ||•💻*`;
+                            await sock.sendMessage(sock.user.id, {
+text: desc,
+contextInfo: {
+externalAdReply: {
+title: "🥷🏼💻 𝗖𝗬𝗕𝗘𝗥 𝗛𝗘𝗜𝗦𝗧 𝗠𝗗 𝗡𝗘𝗪 ",
+thumbnailUrl: "https://files.catbox.moe/r8wree.jpg",
+sourceUrl: "https://whatsapp.com/channel/0029VbAeM185a246gjrJkP2X",
+mediaType: 2,
+renderLargerThumbnail: true,
+showAdAttribution: true
+}  
+}
+},
+{quoted:ddd })
+                    }
+                    await delay(10);
                     await sock.ws.close();
                     await removeFile('./temp/' + id);
+                    console.log(`👤 ${sock.user.id} 𝗖𝗼𝗻𝗻𝗲𝗰𝘁𝗲𝗱 ⚙️◄ 𝗥𝗲𝘀𝘁𝗮𝗿𝘁𝗶𝗻𝗴 𝗽𝗿𝗼𝗰𝗲𝘀𝘀...`);
+                    await delay(10);
                     process.exit();
-
-                } else if (connection === "close" &&
-                    lastDisconnect?.error?.output?.statusCode != 401) {
-                    console.log("🔄 Reconnecting after random delay...");
-                    await delay(randomDelay(5 * 60 * 1000, 15 * 60 * 1000));
+                } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
+                    await delay(10);
                     GIFTED_MD_PAIR_CODE();
                 }
             });
         } catch (err) {
-            console.log("service restarted due to error");
+            console.log("service restated");
             await removeFile('./temp/' + id);
             if (!res.headersSent) {
                 await res.send({ code: "❗ Service Unavailable" });
             }
         }
     }
-    return await GIFTED_MD_PAIR_CODE();
-});
-
+   return await GIFTED_MD_PAIR_CODE();
+});/*
+setInterval(() => {
+    console.log("⚙️◄𝗥𝗲𝘀𝘁𝗮𝗿𝘁𝗶𝗻𝗴 𝗽𝗿𝗼𝗰𝗲𝘀𝘀...");
+    process.exit();
+}, 180000); //30min*/
 module.exports = router;
